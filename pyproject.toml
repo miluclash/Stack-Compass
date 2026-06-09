@@ -1,0 +1,17 @@
+[project]
+name = "stack-compass"
+version = "0.1.0"
+description = "Análisis de la Stack Overflow Developer Survey para identificar qué stacks maximizan salario, satisfacción y empleabilidad en data/IA"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "duckdb>=1.5.3",
+    "matplotlib>=3.10.9",
+    "pandas>=3.0.3",
+    "seaborn>=0.13.2",
+]
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.1.1",
+]
