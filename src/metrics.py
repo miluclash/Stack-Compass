@@ -58,8 +58,29 @@ def satisfaction_by_stack(df: pd.DataFrame) -> pd.DataFrame:
     con = duckdb.connect()
     con.register('survey',df)
     result  = con.execute(
-        
-    )
+        """ 
+        WITH exploded AS(
+            SELECT 
+                Region,
+                UNNEST(string_split(LaguageHaveWorkWith))as tech,
+                JobSat
+            FROM survey
+            WHERE LanguageHaveWorkedWith IS NOT NULL
+        ),
+        base AS(
+            SELECT 
+                Region,
+                AVG(JobSat) as mean_jobsat,
+                COUNT(*) as n
+            FROM exploded
+            WHERE JobSat IS NOT NULL,
+            GROUP BY Region, tech DESC
+            HAVING n >=15
+        ),
+        """
+    ).df()
+    
+    return result
 
 
 def employability_by_stack(df: pd.DataFrame) -> pd.DataFrame:
