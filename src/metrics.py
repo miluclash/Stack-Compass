@@ -62,7 +62,7 @@ def satisfaction_by_stack(df: pd.DataFrame) -> pd.DataFrame:
         WITH exploded AS(
             SELECT 
                 Region,
-                UNNEST(string_split(LaguageHaveWorkWith))as tech,
+                UNNEST(string_split(LanguageHaveWorkedWith, ';'))as tech,
                 JobSat
             FROM survey
             WHERE LanguageHaveWorkedWith IS NOT NULL
@@ -70,13 +70,17 @@ def satisfaction_by_stack(df: pd.DataFrame) -> pd.DataFrame:
         base AS(
             SELECT 
                 Region,
+                tech,
                 AVG(JobSat) as mean_jobsat,
                 COUNT(*) as n
             FROM exploded
-            WHERE JobSat IS NOT NULL,
-            GROUP BY Region, tech DESC
+            WHERE JobSat IS NOT NULL
+            GROUP BY Region, tech 
             HAVING n >=15
-        ),
+        )
+        SELECT * 
+        FROM base
+        ORDER BY Region,tech DESC
         """
     ).df()
     
