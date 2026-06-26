@@ -3,9 +3,9 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-RAW_CSV = Path("data/raw/results.csv")
-PROCESSED_CSV = Path("data/processed/survey_clean.csv")
-
+ROOT = Path(__file__).parent.parent  # src/ -> raíz del proyecto
+RAW_CSV = ROOT / "data" / "raw" / "results.csv"
+PROCESSED_CSV = ROOT / "data" / "processed" / "survey_clean.csv"
 
 def load_raw(path: Path = RAW_CSV) -> pd.DataFrame:
     """Carga el CSV crudo de la encuesta Stack Overflow con low_memory=False."""
