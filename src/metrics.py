@@ -12,7 +12,34 @@ def salary_by_stack(df: pd.DataFrame) -> pd.DataFrame:
     --------
     DataFrame con columnas [stack, median_salary, p25, p75, n] ordenado por mediana desc.
     """
-    # TODO
+    con = duckdb.connect()
+    con.register('survey',df)
+    result  = con.execute(
+        """
+        WITH exploded AS(
+            SELECT 
+                Region,
+                UNNEST(string_split(ConvertedCompYearly, ';')) as tech
+            FROM survey
+            WHERE ConvertedCompYearly IS NOT NULL
+            ),
+        base AS(
+            SELECT 
+                Region,
+                COUNT(*) as n
+            FROM exploded
+            GROUP BY Region, tech
+        ),
+        
+        mediana AS(
+            SELECT *, MEDIAN(), PERCENTILE_COUNT(0.25) as p25, PERCENTILE_COUNT(0.75) as p75, COUNT(*) as n
+            FROM base
+        )
+        SELECT * 
+        FROM mediana
+        GROUP BY Region, stack
+        """
+    )
 
 
 def satisfaction_by_stack(df: pd.DataFrame) -> pd.DataFrame:
@@ -26,7 +53,11 @@ def satisfaction_by_stack(df: pd.DataFrame) -> pd.DataFrame:
     --------
     DataFrame con columnas [stack, mean_jobsat, n] ordenado por satisfacción desc.
     """
-    # TODO
+    con = duckdb.connect()
+    con.register('survey',df)
+    result  = con.execute(
+        
+    )
 
 
 def employability_by_stack(df: pd.DataFrame) -> pd.DataFrame:
