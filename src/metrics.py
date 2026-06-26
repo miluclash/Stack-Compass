@@ -19,27 +19,29 @@ def salary_by_stack(df: pd.DataFrame) -> pd.DataFrame:
         WITH exploded AS(
             SELECT 
                 Region,
-                UNNEST(string_split(ConvertedCompYearly, ';')) as tech
+                UNNEST(string_split(LanguageHaveWorkedWith, ';')) as tech,
+                ConvertedCompYearly
             FROM survey
             WHERE ConvertedCompYearly IS NOT NULL
             ),
         base AS(
-            SELECT 
-                Region,
-                COUNT(*) as n
+            SELECT Region, tech,
+            MEDIAN(ConvertedCompYearly) AS median_salary,
+            PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY ConvertedCompYearly) AS p25,
+            PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY ConvertedCompYearly) AS p75,
+            COUNT(*) AS n
             FROM exploded
+            WHERE ConvertedCompYearly IS NOT NULL
             GROUP BY Region, tech
-        ),
-        
-        mediana AS(
-            SELECT *, MEDIAN(), PERCENTILE_COUNT(0.25) as p25, PERCENTILE_COUNT(0.75) as p75, COUNT(*) as n
-            FROM base
+            HAVING n >= 15
         )
         SELECT * 
-        FROM mediana
-        GROUP BY Region, stack
+        FROM base
+        ORDER BY Region, median_salary DESC
         """
-    )
+    ).df()
+    
+    return result
 
 
 def satisfaction_by_stack(df: pd.DataFrame) -> pd.DataFrame:
