@@ -26,10 +26,11 @@ PAISES_UE = [
 
 
 def filter_population(df: pd.DataFrame) -> pd.DataFrame:
-    """Filtra la encuesta a roles data/IA (núcleo + frontera) en países de la UE.
+    """Conserva solo las filas cuyo DevType incluye al menos un rol data/IA del catálogo.
 
-    Columnas usadas: DevType.
-    Devuelve un subconjunto de filas; no modifica columnas.
+    DevType es una cadena con roles separados por ';'. La función parte cada celda,
+    intersecta con ROLES (núcleo + frontera) y devuelve las filas donde esa
+    intersección no está vacía. No modifica ni añade columnas.
     """
     def belongs(cell):
         if pd.isna(cell):
@@ -45,10 +46,9 @@ def filter_population(df: pd.DataFrame) -> pd.DataFrame:
     return df[mask] 
 
 def filter_geography(df: pd.DataFrame) -> pd.DataFrame:
-    """Filtra la encuesta a países de la UE.
+    """Conserva solo las filas cuyo Country pertenece a los 27 estados miembro de la UE.
 
-    Columnas usadas: Country.
-    Devuelve un subconjunto de filas; no modifica columnas.
+    La lista de países válidos está en PAISES_UE. No modifica ni añade columnas.
     """
     # 1. crear una máscara booleana para Country en PAISES_UE
     mask = df['Country'].isin(PAISES_UE)
@@ -58,9 +58,10 @@ def filter_geography(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_region(df:pd.DataFrame) -> pd.DataFrame:
-    """Agrega una columna Region con valor 'UE' para todos los registros.
+    """Añade la columna 'Region' con dos valores: 'España' o 'UE sin España'.
 
-    Devuelve df con la nueva columna.
+    Asigna 'España' cuando Country == 'Spain' y 'UE sin España' para el resto.
+    Devuelve una copia de df con la nueva columna; no modifica el original.
     """
     df = df.copy()  # Evitar modificar el DataFrame original
     df['Region'] = np.where(
@@ -69,9 +70,12 @@ def add_region(df:pd.DataFrame) -> pd.DataFrame:
     return df
 
 def clean_salary(df: pd.DataFrame) -> pd.DataFrame:
-    """Limpia los valores de ConvertedCompYearly nulos o en percentiles extremos (p1–p99).
+    """Pone a NaN los valores de ConvertedCompYearly fuera del rango [5 000, 300 000].
 
-    Devuelve df sin los outliers salariales para evitar distorsión en métricas.
+    Los umbrales son fijos (no basados en percentiles): valores por debajo de 5 000 USD
+    o por encima de 300 000 USD se consideran errores de reporte o casos atípicos
+    extremos y se anulan para no distorsionar las métricas salariales.
+    Devuelve una copia de df; no modifica el original.
     """
     df = df.copy()  # Evitar modificar el DataFrame original
     # 1. eliminar filas con ConvertedCompYearly nulo
@@ -83,9 +87,12 @@ def clean_salary(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def normalize_multi_valued(df: pd.DataFrame, col: str, sep: str = ";") -> pd.DataFrame:
-    """Expande una columna multi-valor separada por `sep` en filas individuales.
+    """Expande una columna multi-valor en filas individuales (una tecnología por fila).
 
-    Ejemplo: 'Python;SQL;R' → tres filas. Útil para LanguageHaveWorkedWith, etc.
-    Devuelve un DataFrame con las demás columnas replicadas por fila.
+    Divide cada celda de `col` por `sep` y crea una fila por valor resultante,
+    replicando el resto de columnas. Por ejemplo, una fila con
+    LanguageHaveWorkedWith='Python;SQL;R' se convierte en tres filas independientes.
+
+    Pendiente de implementar (TODO).
     """
     # TODO

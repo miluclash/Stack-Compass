@@ -2,15 +2,20 @@ import pandas as pd
 import duckdb
 
 def salary_by_stack(df: pd.DataFrame) -> pd.DataFrame:
-    """Mediana y percentiles de ConvertedCompYearly agrupados por stack tecnológico.
+    """Calcula mediana salarial y percentiles p25/p75 por tecnología y región.
+
+    Usa DuckDB para expandir la columna LanguageHaveWorkedWith (separada por ';')
+    y agrupa por (Region, tech). Excluye grupos con menos de 15 respondentes.
 
     Parámetros
     ----------
-    df : DataFrame ya filtrado (output de filter_population + clean_salary).
+    df : DataFrame ya filtrado (output de filter_population + clean_salary),
+         con columnas Region, LanguageHaveWorkedWith y ConvertedCompYearly.
 
     Devuelve
     --------
-    DataFrame con columnas [stack, median_salary, p25, p75, n] ordenado por mediana desc.
+    DataFrame con columnas [Region, tech, median_salary, p25, p75, n],
+    ordenado por Region y median_salary descendente.
     """
     con = duckdb.connect()
     con.register('survey',df)
@@ -45,15 +50,19 @@ def salary_by_stack(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def satisfaction_by_stack(df: pd.DataFrame) -> pd.DataFrame:
-    """Puntuación media de JobSat por stack tecnológico.
+    """Calcula la satisfacción laboral media (JobSat) por tecnología y región.
+
+    Usa DuckDB para expandir LanguageHaveWorkedWith (separada por ';') y calcula
+    AVG(JobSat) por (Region, tech). Excluye grupos con menos de 15 respondentes.
 
     Parámetros
     ----------
-    df : DataFrame ya filtrado.
+    df : DataFrame ya filtrado, con columnas Region, LanguageHaveWorkedWith y JobSat.
 
     Devuelve
     --------
-    DataFrame con columnas [stack, mean_jobsat, n] ordenado por satisfacción desc.
+    DataFrame con columnas [Region, tech, mean_jobsat, n],
+    ordenado por Region y mean_jobsat descendente.
     """
     con = duckdb.connect()
     con.register('survey',df)
@@ -80,7 +89,7 @@ def satisfaction_by_stack(df: pd.DataFrame) -> pd.DataFrame:
         )
         SELECT * 
         FROM base
-        ORDER BY Region,tech DESC
+        ORDER BY Region,mean_jobsat DESC
         """
     ).df()
     
@@ -88,17 +97,21 @@ def satisfaction_by_stack(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def employability_by_stack(df: pd.DataFrame) -> pd.DataFrame:
-    """Frecuencia de aparición de cada stack en la población filtrada (proxy de empleabilidad).
+    """Cuenta respondentes por tecnología y región como proxy de empleabilidad.
 
-    Cuenta cuántos respondentes declaran usar cada tecnología en LanguageHaveWorkedWith.
+    Usa DuckDB para expandir LanguageHaveWorkedWith (separada por ';'), cuenta
+    cuántos respondentes declaran cada tecnología por (Region, tech) y asigna
+    un ranking dentro de cada región según esa frecuencia. Excluye grupos con
+    menos de 15 respondentes. El DataFrame de entrada no necesita estar pre-expandido.
 
     Parámetros
     ----------
-    df : DataFrame ya filtrado (filas expandidas por normalize_multi_valued).
+    df : DataFrame ya filtrado, con columnas Region y LanguageHaveWorkedWith.
 
     Devuelve
     --------
-    DataFrame con columnas [stack, count, pct] ordenado por frecuencia desc.
+    DataFrame con columnas [tech, Region, n, rank],
+    ordenado por Region y rank ascendente (rank=1 es la tech más frecuente).
     """
     
     con = duckdb.connect()
