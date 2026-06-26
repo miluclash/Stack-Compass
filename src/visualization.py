@@ -99,6 +99,9 @@ def build_dashboard(df_salary, df_sat, df_emp,
                 ax.errorbar(sub[vcol], y_pos,
                             xerr=[err_low, err_high],
                             fmt="none", ecolor="#444", elinewidth=1.2, capsize=3)
+            
+            if vcol == sat_col:
+                ax.set_xlim(left=4) #Limita la grafica a que comience desde el 4
 
             ax.set_yticks(y_pos)
             ax.set_yticklabels(sub["tech"])
