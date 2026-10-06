@@ -50,96 +50,86 @@ def salary_by_stack(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def satisfaction_by_stack(df: pd.DataFrame) -> pd.DataFrame:
-    """Calcula la satisfacción laboral media (JobSat) por tecnología y región.
+    """Satisfacción = % de retención (Admired) por tecnología y región.
 
-    Usa DuckDB para expandir LanguageHaveWorkedWith (separada por ';') y calcula
-    AVG(JobSat) por (Region, tech). Excluye grupos con menos de 15 respondentes.
-
-    Parámetros
-    ----------
-    df : DataFrame ya filtrado, con columnas Region, LanguageHaveWorkedWith y JobSat.
-
-    Devuelve
-    --------
-    DataFrame con columnas [Region, tech, mean_jobsat, n],
-    ordenado por Region y mean_jobsat descendente.
+    Para cada tech: de los que la USARON (LanguageHaveWorkedWith), qué fracción
+    la ADMIRA (LanguageAdmired = usó Y repetiría). Score 0-100. Solo techs con
+    n_used >= 15. Devuelve [Region, tech, n, admired_pct].
     """
     con = duckdb.connect()
-    con.register('survey',df)
-    result  = con.execute(
-        """ 
-        WITH exploded AS(
-            SELECT 
+    con.register('survey', df)
+    result = con.execute("""
+        WITH used AS (
+            SELECT ResponseId, Region,
+                   trim(UNNEST(string_split(LanguageHaveWorkedWith, ';'))) AS tech
+            FROM survey WHERE LanguageHaveWorkedWith IS NOT NULL
+        ),
+        admired AS (
+            SELECT ResponseId, Region,
+                   trim(UNNEST(string_split(LanguageAdmired, ';'))) AS tech
+            FROM survey WHERE LanguageAdmired IS NOT NULL
+        ),
+        used_counts AS (
+            SELECT Region, tech, COUNT(DISTINCT ResponseId) AS n_used
+            FROM used WHERE tech <> '' GROUP BY Region, tech
+        ),
+        admired_counts AS (
+            SELECT Region, tech, COUNT(DISTINCT ResponseId) AS n_admired
+            FROM admired WHERE tech <> '' GROUP BY Region, tech
+        )
+        SELECT u.Region, u.tech, u.n_used AS n,
+               COALESCE(a.n_admired, 0) * 100.0 / u.n_used AS admired_pct
+        FROM used_counts u
+        LEFT JOIN admired_counts a USING (Region, tech)
+        WHERE u.n_used >= 15
+        ORDER BY u.Region, admired_pct DESC
+    """).df()
+    return result
+
+def employability_by_stack(df: pd.DataFrame) -> pd.DataFrame:
+    """Empleabilidad = % de respondentes que declara cada tech, por región.
+
+    Expande LanguageHaveWorkedWith (separada por ';'), cuenta personas distintas
+    por (Region, tech) y lo divide entre el total de personas que contestaron la
+    pregunta de stack en esa región. Así el % es comparable entre España y UE pese
+    a la diferencia de tamaño de muestra. Solo se devuelven techs con n >= 15.
+
+    Devuelve [tech, Region, n, pct, rank], ordenado por Region y rank ascendente.
+    """
+    con = duckdb.connect()
+    con.register('survey', df)
+
+    result = con.execute("""
+        WITH exploded AS (
+            SELECT
+                ResponseId,
                 Region,
-                UNNEST(string_split(LanguageHaveWorkedWith, ';'))as tech,
-                JobSat
+                trim(UNNEST(string_split(LanguageHaveWorkedWith, ';'))) AS tech
             FROM survey
             WHERE LanguageHaveWorkedWith IS NOT NULL
         ),
-        base AS(
-            SELECT 
-                Region,
-                tech,
-                AVG(JobSat) as mean_jobsat,
-                COUNT(*) as n
+        tech_counts AS (                       -- numerador: personas por tech
+            SELECT Region, tech, COUNT(DISTINCT ResponseId) AS n
             FROM exploded
-            WHERE JobSat IS NOT NULL
-            GROUP BY Region, tech 
-            HAVING n >=15
-        )
-        SELECT * 
-        FROM base
-        ORDER BY Region,mean_jobsat DESC
-        """
-    ).df()
-    
-    return result
-
-
-def employability_by_stack(df: pd.DataFrame) -> pd.DataFrame:
-    """Cuenta respondentes por tecnología y región como proxy de empleabilidad.
-
-    Usa DuckDB para expandir LanguageHaveWorkedWith (separada por ';'), cuenta
-    cuántos respondentes declaran cada tecnología por (Region, tech) y asigna
-    un ranking dentro de cada región según esa frecuencia. Excluye grupos con
-    menos de 15 respondentes. El DataFrame de entrada no necesita estar pre-expandido.
-
-    Parámetros
-    ----------
-    df : DataFrame ya filtrado, con columnas Region y LanguageHaveWorkedWith.
-
-    Devuelve
-    --------
-    DataFrame con columnas [tech, Region, n, rank],
-    ordenado por Region y rank ascendente (rank=1 es la tech más frecuente).
-    """
-    
-    con = duckdb.connect()
-    con.register('survey',df)
-    
-    result = con.execute("""
-        WITH exploded AS (
-            -- Primero expandimos el array aquí, donde sí está permitido
-            SELECT 
-                Region,
-                UNNEST(string_split(LanguageHaveWorkedWith, ';')) AS tech
-            FROM survey 
+            WHERE tech <> ''
+            GROUP BY Region, tech
+        ),
+        region_totals AS (                     -- denominador: personas por región
+            SELECT Region, COUNT(DISTINCT ResponseId) AS region_n
+            FROM survey
             WHERE LanguageHaveWorkedWith IS NOT NULL
-        ),
-        base AS (
-            -- Luego agregamos sobre los datos ya expandidos
-            SELECT tech, Region, COUNT(*) as n 
-            FROM exploded
-            GROUP BY Region, tech 
-            HAVING n >= 15 
-        ),
-        ranked AS (
-            SELECT *, RANK() OVER (PARTITION BY Region ORDER BY n DESC) AS rank
-            FROM base
+            GROUP BY Region
         )
-        SELECT * FROM ranked
-        ORDER BY Region, rank
-        
+        SELECT
+            t.tech,
+            t.Region,
+            t.n,
+            t.n * 100.0 / r.region_n AS pct,
+            RANK() OVER (PARTITION BY t.Region ORDER BY t.n DESC) AS rank
+        FROM tech_counts t
+        JOIN region_totals r USING (Region)
+        WHERE t.n >= 15
+        ORDER BY t.Region, rank
     """).df()
-    
+
     return result
