@@ -1,5 +1,4 @@
 import pandas as pd
-import math
 import numpy as np
 
 ROLES_NUCLEO = [
@@ -86,13 +85,3 @@ def clean_salary(df: pd.DataFrame) -> pd.DataFrame:
     
     return df
 
-def normalize_multi_valued(df: pd.DataFrame, col: str, sep: str = ";") -> pd.DataFrame:
-    """Expande una columna multi-valor en filas individuales (una tecnología por fila).
-
-    Divide cada celda de `col` por `sep` y crea una fila por valor resultante,
-    replicando el resto de columnas. Por ejemplo, una fila con
-    LanguageHaveWorkedWith='Python;SQL;R' se convierte en tres filas independientes.
-
-    Pendiente de implementar (TODO).
-    """
-    # TODO

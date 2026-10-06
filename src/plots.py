@@ -1,104 +1,118 @@
-"""
-Stack Compass — Figura compuesta 3×2 (Punto 8)
-
-Fila   = métrica (salario / empleabilidad / satisfacción)
-Columna = región (España / UE-sin-España)
-
-Entrada: los 3 DataFrames que devuelven las queries de DuckDB (metrics.py).
-
-Spec del dashboard respetada:
-  · colormap tab20 GLOBAL — cada tech conserva su color en todos los paneles
-  · techs presentes en una sola región → gris neutro (no son comparables)
-  · eje de satisfacción arranca en 4
-  · barras de error de salario = p25–p75 respecto a la mediana
-
->>> AJUSTA el bloque de constantes a los nombres reales de tus queries. <<<
-"""
 import matplotlib.pyplot as plt
-import numpy as np
+import matplotlib.patches as mpatches
+import matplotlib.cm as cm
 
-# ── Constantes a verificar contra tus DataFrames ──────────────────
-REGION_COL, TECH_COL = "Region", "tech"
-ES, EU = "España", "UE-sin-España"
-
-COLS = {
-    "salary": {"value": "median_salary", "p25": "p25", "p75": "p75"},
-    "employ": {"value": "pct"},    # porcentaje 0–100, NO conteo (ojo bug M2)
-    "satis":  {"value": "score"},  # % de retención, 0–100
-}
-TITLES = {
-    "salary": "Salario mediano (USD)",
-    "employ": "Empleabilidad (% de uso)",
-    "satis":  "Satisfacción (% retención)",
-}
-GRAY = "#9aa0a6"
+NEUTRAL = "#8C8C8C"   # tech exclusiva de la región
+TOP_N = 15
 
 
-def _color_map(dfs):
-    """Un color tab20 por tech, estable en toda la figura."""
-    techs = sorted({t for df in dfs for t in df[TECH_COL].unique()})
-    cmap = plt.get_cmap("tab20", max(len(techs), 1))
-    return {t: cmap(i) for i, t in enumerate(techs)}
+def _prep(df_metric, region, value_col, sort_desc=True):
+    """Devuelve las TOP_N filas de df_metric para la región dada, ordenadas por value_col.
+
+    Filtra las filas donde la columna 'Region' coincide con region, ordena
+    descendentemente si sort_desc=True (ascendentemente si False) y recorta
+    al máximo de TOP_N filas.
+    """
+    sub = df_metric[df_metric["Region"] == region].copy()
+    sub = sub.sort_values(value_col, ascending=not sort_desc)
+    return sub.head(TOP_N)
 
 
-def _shared_techs(df_a, df_b):
-    """Techs presentes en ambas regiones → comparables (color); el resto, gris."""
-    return set(df_a[TECH_COL]) & set(df_b[TECH_COL])
+def _global_color_map(df_salary, df_sat, df_emp, region_es, region_eu,
+                      salary_col, sat_col, emp_col):
+    """Construye un mapa {tech: color} consistente para todo el dashboard.
+
+    Recorre los tres DataFrames de métricas (salario, satisfacción, empleabilidad)
+    y calcula la intersección de tecnologías que aparecen en el top de ambas
+    regiones en al menos una métrica. A cada tech común le asigna un color
+    único de la paleta tab20. Las techs que no están en la intersección se
+    representarán con NEUTRAL (gris) al pintar las barras.
+    """
+    common = set()
+    for df_metric, vcol in [(df_salary, salary_col),
+                            (df_sat, sat_col),
+                            (df_emp, emp_col)]:
+        es = _prep(df_metric, region_es, vcol)
+        eu = _prep(df_metric, region_eu, vcol)
+        common |= set(es["tech"]) & set(eu["tech"])
+
+    cmap = cm.get_cmap("tab20")
+    return {tech: cmap(i % 20) for i, tech in enumerate(sorted(common))}
 
 
-def _draw(ax, df, metric, colors, shared, region_label):
-    c = COLS[metric]
-    d = df.sort_values(c["value"]).reset_index(drop=True)
-    y = np.arange(len(d))
-    bar_colors = [colors[t] if t in shared else GRAY for t in d[TECH_COL]]
+def _bar_colors(sub, color_map):
+    """Devuelve la lista de colores para las barras de un subplot.
 
-    if metric == "salary":
-        vals = d[c["value"]].to_numpy(dtype=float)
-        lo = vals - d[c["p25"]].to_numpy(dtype=float)
-        hi = d[c["p75"]].to_numpy(dtype=float) - vals
-        ax.barh(y, vals, color=bar_colors,
-                xerr=[lo, hi], error_kw=dict(ecolor="#555", lw=0.8, capsize=2))
-    else:
-        ax.barh(y, d[c["value"]].to_numpy(dtype=float), color=bar_colors)
-        if metric == "satis":
-            ax.set_xlim(left=4)  # spec: eje de satisfacción desde 4
-
-    ax.set_yticks(y)
-    ax.set_yticklabels(d[TECH_COL], fontsize=8)
-    ax.set_title(region_label, fontsize=10, loc="left")
-    ax.tick_params(axis="x", labelsize=8)
-    ax.spines[["top", "right"]].set_visible(False)
+    Para cada fila de sub (ordenada como se va a dibujar) busca su tech en
+    color_map. Si la tech está en el mapa devuelve su color asignado;
+    si no (tech exclusiva de esa región), devuelve NEUTRAL.
+    """
+    return [color_map.get(t, NEUTRAL) for t in sub["tech"]]
 
 
-def build_figure(salary_df, employ_df, satis_df, outfile="figures/dashboard.png"):
-    data = {"salary": salary_df, "employ": employ_df, "satis": satis_df}
-    colors = _color_map([salary_df, employ_df, satis_df])
+def build_dashboard(df_salary, df_sat, df_emp,
+                    region_es="España", region_eu="UE sin España",
+                    salary_col="median_salary", sat_col="admired_pct", emp_col="pct"):
+    """Genera la figura comparativa España vs UE con las tres métricas clave.
 
-    fig, axes = plt.subplots(3, 2, figsize=(12, 13))
-    for row, metric in enumerate(["salary", "employ", "satis"]):
-        df = data[metric]
-        es = df[df[REGION_COL] == ES]
-        eu = df[df[REGION_COL] == EU]
-        shared = _shared_techs(es, eu)
-        _draw(axes[row, 0], es, metric, colors, shared, ES)
-        _draw(axes[row, 1], eu, metric, colors, shared, EU)
-        axes[row, 0].set_ylabel(TITLES[metric], fontsize=11)
+    Crea una cuadrícula de 3 filas × 2 columnas (fila=métrica, columna=región).
+    Cada subgráfico es un gráfico de barras horizontales con las TOP_N tecnologías
+    de esa región para esa métrica:
+      - Fila 0: salario mediano con barras de error p25–p75.
+      - Fila 1: satisfacción (% que lo repetiría, Admired).
+      - Fila 2: empleabilidad (% de uso).
 
-    fig.suptitle("Stack Compass — España vs UE-sin-España", fontsize=15, y=0.995)
-    fig.text(0.5, 0.005,
-             "Gris = tech presente en una sola región (no comparable).  "
-             "El eje de satisfacción arranca en 4, no en 0.",
-             ha="center", fontsize=8, color="#666")
-    fig.tight_layout(rect=[0, 0.02, 1, 0.98])
-    fig.savefig(outfile, dpi=150, bbox_inches="tight")
-    print(f"Figura guardada en {outfile}")
-    return fig
+    Las techs comunes a ambas regiones en al menos una métrica comparten color
+    entre todos los subgráficos; las exclusivas de cada región se pintan en gris.
+    La leyenda global se sitúa en la parte superior de la figura.
 
-
-if __name__ == "__main__":
-    # TODO MICHAEL: importa tus DataFrames reales (de src.metrics o del notebook)
-    #   from src.metrics import salary_df, employ_df, satis_df
-    #   build_figure(salary_df, employ_df, satis_df)
-    raise SystemExit(
-        "Importa tus DataFrames reales antes de correr. Mira el bloque __main__."
+    Devuelve el objeto matplotlib.figure.Figure resultante.
+    """
+    color_map = _global_color_map(
+        df_salary, df_sat, df_emp, region_es, region_eu,
+        salary_col, sat_col, emp_col,
     )
+
+    fig, axes = plt.subplots(3, 2, figsize=(14, 16))
+
+    metrics = [
+        ("Salario mediano (USD/año)", df_salary, salary_col, True),
+        ("Satisfacción (% lo repetiría)", df_sat, sat_col, True),
+        ("Empleabilidad (% de uso)", df_emp, emp_col, True),
+    ]
+
+    for row, (title, df_metric, vcol, desc) in enumerate(metrics):
+        es = _prep(df_metric, region_es, vcol, desc)
+        eu = _prep(df_metric, region_eu, vcol, desc)
+
+        for col, (sub, region_label) in enumerate([(es, "España"), (eu, "UE")]):
+            ax = axes[row][col]
+            y_pos = range(len(sub))
+            colors = _bar_colors(sub, color_map)
+
+            ax.barh(y_pos, sub[vcol], color=colors)
+
+            if vcol == salary_col:
+                err_low = sub[vcol] - sub["p25"]
+                err_high = sub["p75"] - sub[vcol]
+                ax.errorbar(sub[vcol], y_pos,
+                            xerr=[err_low, err_high],
+                            fmt="none", ecolor="#444", elinewidth=1.2, capsize=3)
+
+            ax.set_yticks(y_pos)
+            ax.set_yticklabels(sub["tech"])
+            ax.invert_yaxis()
+            ax.set_title(f"{region_label} — {title}", fontsize=11)
+            ax.tick_params(labelsize=9)
+
+    legend_handles = [
+        mpatches.Patch(color=color, label=tech)
+        for tech, color in color_map.items()
+    ]
+    legend_handles.append(mpatches.Patch(color=NEUTRAL, label="Exclusiva de la región"))
+    fig.legend(handles=legend_handles, loc="upper center",
+               ncol=6, fontsize=9, bbox_to_anchor=(0.5, 1.0))
+
+    fig.suptitle("Stack Compass — España vs UE", fontsize=15, y=1.04)
+    fig.tight_layout(rect=[0, 0, 1, 0.97])
+    return fig
