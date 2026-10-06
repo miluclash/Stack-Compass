@@ -10,7 +10,7 @@ Análisis de la **Stack Overflow Annual Developer Survey 2025** (49.191 respuest
 
 - **Empleabilidad — Python es casi monocultivo en España.** Lo usa ~92% del perfil data/IA español, frente a ~83% en la UE. La diferencia real es la dispersión: la UE reparte el uso entre muchas más tecnologías (Go, Rust, C#, Java…); el stack data español se concentra en un puñado.
 - **Satisfacción — el contraste más claro.** En España, Python y TypeScript lideran la retención (~55%), pero HTML/CSS y JavaScript caen a ~26%: la mitad de quien los usa no los repetiría. En la UE el top lo copan techs emergentes (GDScript, Zig, Rust: 70–82%) sin muestra suficiente en España. De las techs comunes, Python gana en satisfacción en ambas regiones.
-- **Salario — banda estrecha y muy incierta en España.** *~58k–75k* Las barras de error p25–p75 son casi tan anchas como las barras: con 70 personas con salario, el ranking salarial español es orientativo. La UE paga más en todo y tiene más techs bien pagadas.
+- **Salario — banda estrecha y muy incierta en España.** Las medianas se apiñan entre ~58k (JavaScript) y ~75k (TypeScript) USD, con Python y Bash/Shell rondando los 70k. Las barras de error p25–p75 son casi tan anchas como las propias barras: con 70 personas con salario, el ranking salarial español es orientativo, no concluyente. La UE paga más en todo y reparte los sueldos altos entre más tecnologías (Rust, Go, MATLAB).
 - **El hallazgo que enmarca todo:** España supera el umbral n≥15 en solo 6 tecnologías por métrica; la UE en 15. No es una carencia del análisis — es el retrato de un mercado más pequeño donde pocas tecnologías alcanzan masa crítica. La comparación se juega en esas 6 comunes (Python, SQL, Bash/Shell, JavaScript, HTML/CSS, TypeScript).
 
 ## Método
@@ -58,7 +58,7 @@ Requiere [uv](https://github.com/astral-sh/uv). El CSV crudo no está versionado
 
 ```bash
 git clone https://github.com/miluclash/Stack-Compass.git
-cd stack-compass
+cd Stack-Compass
 uv sync
 
 # pipeline completo: limpia → 3 métricas → imprime tablas → genera figures/dashboard.png
