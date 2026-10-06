@@ -54,7 +54,7 @@ stack-compass/
 
 ## Reproducir
 
-Requiere [uv](https://github.com/astral-sh/uv). El CSV crudo no está versionado: descárgalo de la [Stack Overflow Developer Survey](https://survey.stackoverflow.co/) y colócalo en `data/raw/results.csv`.
+Requiere [uv](https://github.com/astral-sh/uv). El CSV crudo no está versionado: descárgalo de la [Stack Overflow Developer Survey](https://survey.stackoverflow.co/) en el apartado ***2025 -> Data & files*** o del repo de [Stack Exchange](https://github.com/StackExchange/Survey/tree/main/packages/archive/2025) y colócalo en `data/raw/results.csv`.
 
 ```bash
 git clone https://github.com/miluclash/Stack-Compass.git
